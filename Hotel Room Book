@@ -1,0 +1,219 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define MAX_ROOMS 10
+#define NAME_LEN 50
+#define TYPE_LEN 20
+#define FILE_NAME "bookings.txt"
+
+/* User-defined data: one room */
+typedef struct {
+    int number;
+    char type[TYPE_LEN];
+    float price;        /* price per night */
+    int isBooked;       /* 0 = free, 1 = booked */
+    char guest[NAME_LEN];
+    int nights;
+} Room;
+
+/* Set up the rooms (rooms 101 to 110) */
+void initRooms(Room *rooms) {
+    const char *types[] = {"Single", "Double", "Suite"};
+    float prices[] = {1000.0, 1500.0, 3000.0};
+    int i, t;
+
+    for (i = 0; i < MAX_ROOMS; i++) {
+        t = i % 3;
+        rooms[i].number = 101 + i;
+        strcpy(rooms[i].type, types[t]);
+        rooms[i].price = prices[t];
+        rooms[i].isBooked = 0;
+        strcpy(rooms[i].guest, "-");
+        rooms[i].nights = 0;
+    }
+}
+
+/* Show all rooms in a table */
+void showRooms(const Room *rooms) {
+    int i;
+
+    printf("\n%-8s %-10s %-10s %-10s\n", "Room", "Type", "Price", "Status");
+    printf("----------------------------------------\n");
+    for (i = 0; i < MAX_ROOMS; i++) {
+        printf("%-8d %-10s %-10.2f %-10s\n",
+               rooms[i].number,
+               rooms[i].type,
+               rooms[i].price,
+               rooms[i].isBooked ? "Booked" : "Free");
+    }
+}
+
+/* Find a room by number. Returns the index, or -1 if not found */
+int findRoom(const Room *rooms, int number) {
+    int i;
+
+    for (i = 0; i < MAX_ROOMS; i++) {
+        if (rooms[i].number == number) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+/* Book a free room */
+void bookRoom(Room *rooms) {
+    int number, nights, index;
+    char name[NAME_LEN];
+    Room *r;
+
+    showRooms(rooms);
+
+    printf("\nEnter room number to book: ");
+    scanf("%d", &number);
+
+    index = findRoom(rooms, number);
+    if (index == -1) {
+        printf("Room not found.\n");
+        return;
+    }
+
+    r = &rooms[index];
+    if (r->isBooked) {
+        printf("Sorry, room %d is already booked.\n", number);
+        return;
+    }
+
+    printf("Enter guest name: ");
+    scanf(" %49[^\n]", name);
+
+    printf("How many nights? ");
+    scanf("%d", &nights);
+    if (nights <= 0) {
+        printf("Invalid number of nights.\n");
+        return;
+    }
+
+    r->isBooked = 1;
+    strcpy(r->guest, name);
+    r->nights = nights;
+
+    printf("\nBooking confirmed!\n");
+    printf("Guest: %s\n", r->guest);
+    printf("Room: %d (%s)\n", r->number, r->type);
+    printf("Total bill: %.2f\n", r->price * nights);
+}
+
+/* Cancel a booking */
+void cancelBooking(Room *rooms) {
+    int number, index;
+
+    printf("Enter room number to cancel: ");
+    scanf("%d", &number);
+
+    index = findRoom(rooms, number);
+    if (index == -1) {
+        printf("Room not found.\n");
+        return;
+    }
+    if (!rooms[index].isBooked) {
+        printf("Room %d is not booked.\n", number);
+        return;
+    }
+
+    rooms[index].isBooked = 0;
+    strcpy(rooms[index].guest, "-");
+    rooms[index].nights = 0;
+    printf("Booking for room %d cancelled.\n", number);
+}
+
+/* Save all rooms to a file */
+void saveBookings(const Room *rooms) {
+    FILE *fp;
+    int i;
+
+    fp = fopen(FILE_NAME, "w");
+    if (fp == NULL) {
+        printf("Could not save bookings.\n");
+        return;
+    }
+
+    for (i = 0; i < MAX_ROOMS; i++) {
+        fprintf(fp, "%d %s %.2f %d %d %s\n",
+                rooms[i].number,
+                rooms[i].type,
+                rooms[i].price,
+                rooms[i].isBooked,
+                rooms[i].nights,
+                rooms[i].guest);
+    }
+    fclose(fp);
+}
+
+/* Load rooms from a file (if the file exists) */
+void loadBookings(Room *rooms) {
+    FILE *fp;
+    int i;
+
+    fp = fopen(FILE_NAME, "r");
+    if (fp == NULL) {
+        return;   /* no saved file yet */
+    }
+
+    for (i = 0; i < MAX_ROOMS; i++) {
+        fscanf(fp, "%d %19s %f %d %d %49[^\n]",
+               &rooms[i].number,
+               rooms[i].type,
+               &rooms[i].price,
+               &rooms[i].isBooked,
+               &rooms[i].nights,
+               rooms[i].guest);
+    }
+    fclose(fp);
+}
+
+int main(void) {
+    Room *rooms;
+    int choice;
+
+    /* Dynamic memory: create space for the rooms */
+    rooms = (Room *)malloc(MAX_ROOMS * sizeof(Room));
+    if (rooms == NULL) {
+        printf("Memory error.\n");
+        return 1;
+    }
+
+    initRooms(rooms);
+    loadBookings(rooms);
+
+    do {
+        printf("\n===== HOTEL BOOKING SYSTEM =====\n");
+        printf("1. Show rooms\n");
+        printf("2. Book a room\n");
+        printf("3. Cancel a booking\n");
+        printf("4. Save and exit\n");
+        printf("Enter choice: ");
+        scanf("%d", &choice);
+
+        switch (choice) {
+            case 1:
+                showRooms(rooms);
+                break;
+            case 2:
+                bookRoom(rooms);
+                break;
+            case 3:
+                cancelBooking(rooms);
+                break;
+            case 4:
+                saveBookings(rooms);
+                printf("Bookings saved. Goodbye!\n");
+                break;
+            default:
+                printf("Invalid choice, try again.\n");
+        }
+    } while (choice != 4);
+
+    free(rooms);
+    return 0;
+}
